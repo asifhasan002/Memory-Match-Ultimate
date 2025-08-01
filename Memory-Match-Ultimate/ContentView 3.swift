@@ -457,13 +457,13 @@ struct GameView: View {
                     .padding(.top, 20)
                     
                     // Cards Grid
-                    let columns = min(6, settings.numberOfCards <= 6 ? settings.numberOfCards :
-                                    settings.numberOfCards <= 12 ? 3 :
-                                    settings.numberOfCards <= 24 ? 4 : 6)
+                    let columns = min(4, settings.numberOfCards <= 4 ? settings.numberOfCards :
+                                    settings.numberOfCards <= 8 ? 2 :
+                                    settings.numberOfCards <= 16 ? 3 : 4)
                     
                     LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 10), count: columns), spacing: 10) {
                         ForEach(cards) { card in
-                            CardView(card: card, dotsPerCard: settings.dotsPerCard) { dot in
+                            CardView(card: card, dotsPerCard: settings.dotsPerCard, columns: columns) { dot in
                                 selectDot(dot, from: card)
                             }
                         }
@@ -638,11 +638,18 @@ struct GameView: View {
 struct CardView: View {
     let card: Card
     let dotsPerCard: Int
+    let columns: Int
     let onDotTap: (Dot) -> Void
     
     var body: some View {
-        let columns = dotsPerCard <= 4 ? 2 : 3
-        let size: CGFloat = dotsPerCard <= 4 ? 100 : dotsPerCard <= 6 ? 80 : 60
+        let screenWidth = UIScreen.main.bounds.width
+        let padding: CGFloat = 60 // Total horizontal padding (20 per side + spacing)
+        let spacing: CGFloat = CGFloat(columns - 1) * 10 // Spacing between cards
+        let cardSize = (screenWidth - padding - spacing) / CGFloat(columns)
+        
+        // Calculate dots grid based on dotsPerCard
+        let dotColumns = dotsPerCard <= 4 ? 2 : dotsPerCard <= 9 ? 3 : 4
+        let dotSize = (cardSize - 32) / CGFloat(dotColumns) // 32 = padding inside card (16 per side)
         
         RoundedRectangle(cornerRadius: 15)
             .fill(
@@ -658,24 +665,25 @@ struct CardView: View {
             )
             .shadow(color: .black.opacity(0.2), radius: 5, x: 0, y: 2)
             .overlay(
-                LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 4), count: columns), spacing: 4) {
+                LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 4), count: dotColumns), spacing: 4) {
                     ForEach(card.dots) { dot in
-                        DotView(dot: dot)
-                            .aspectRatio(1, contentMode: .fit)
+                        DotView(dot: dot, size: dotSize)
+                            .frame(width: dotSize, height: dotSize)
                             .onTapGesture {
                                 onDotTap(dot)
                             }
                     }
                 }
-                .padding(8)
+                .padding(16)
             )
-            .frame(width: size, height: size)
+            .frame(width: cardSize, height: cardSize)
     }
 }
 
 // MARK: - Enhanced Dot View
 struct DotView: View {
     let dot: Dot
+    let size: CGFloat
     
     var body: some View {
         ZStack {
@@ -700,14 +708,14 @@ struct DotView: View {
             
             if dot.isRevealed {
                 Image(systemName: dot.imageName)
-                    .font(.system(size: 12, weight: .medium))
+                    .font(.system(size: max(8, size * 0.4), weight: .medium))
                     .foregroundColor(dot.isMatched ? .green : .blue)
                     .scaleEffect(dot.isMatched ? 1.2 : 1.0)
                     .animation(.easeInOut(duration: 0.3), value: dot.isMatched)
             } else {
                 Circle()
                     .fill(Color.white.opacity(0.2))
-                    .frame(width: 4, height: 4)
+                    .frame(width: max(4, size * 0.15), height: max(4, size * 0.15))
             }
         }
         .scaleEffect(dot.isSelected ? 1.1 : 1.0)
