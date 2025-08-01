@@ -7,78 +7,126 @@
 
 import SwiftUI
 
-struct MemoryCard: Identifiable {
+struct Dot: Identifiable {
     let id = UUID()
-    let symbol: String
-    var isFaceUp = false
+    let imageName: String
+    var isRevealed = false
     var isMatched = false
+    var isSelected = false
+}
+
+struct Card: Identifiable {
+    let id = UUID()
+    var dots: [Dot]
 }
 
 struct ContentView: View {
-    @State private var cards: [MemoryCard] = []
-    @State private var flippedCards: [MemoryCard] = []
+    @State private var cards: [Card] = []
+    @State private var selectedDots: [Dot] = []
     @State private var moves = 0
     @State private var gameWon = false
     @State private var showingWinAlert = false
     
-    private let symbols = ["star.fill", "heart.fill", "star.fill", "heart.fill"]
+    // 9 different system images for the dots
+    private let imageNames = [
+        "star.fill", "heart.fill", "moon.fill", "sun.max.fill",
+        "leaf.fill", "flame.fill", "drop.fill", "bolt.fill", "gift.fill"
+    ]
     
     var body: some View {
         ZStack {
-            // Background gradient
+            // Beautiful gradient background
             LinearGradient(
-                gradient: Gradient(colors: [Color.blue.opacity(0.3), Color.purple.opacity(0.3)]),
+                gradient: Gradient(colors: [
+                    Color.blue.opacity(0.4),
+                    Color.purple.opacity(0.4),
+                    Color.pink.opacity(0.3)
+                ]),
                 startPoint: .topLeading,
                 endPoint: .bottomTrailing
             )
             .ignoresSafeArea()
             
-            VStack(spacing: 30) {
+            VStack(spacing: 25) {
                 // Header
-                VStack(spacing: 10) {
+                VStack(spacing: 8) {
                     Text("Memory Match")
-                        .font(.largeTitle)
-                        .fontWeight(.bold)
+                        .font(.system(size: 32, weight: .bold, design: .rounded))
                         .foregroundColor(.primary)
+                        .shadow(color: .black.opacity(0.1), radius: 2, x: 0, y: 1)
+                    
+                    Text("Match pairs across cards!")
+                        .font(.title3)
+                        .foregroundColor(.secondary)
                     
                     Text("Moves: \(moves)")
                         .font(.title2)
-                        .foregroundColor(.secondary)
+                        .fontWeight(.semibold)
+                        .foregroundColor(.blue)
+                        .padding(.horizontal, 20)
+                        .padding(.vertical, 8)
+                        .background(
+                            RoundedRectangle(cornerRadius: 15)
+                                .fill(.ultraThinMaterial)
+                        )
                 }
                 .padding(.top, 20)
                 
-                // Game grid
-                LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 15), count: 2), spacing: 15) {
+                // Two Cards with 3x3 dots each
+                HStack(spacing: 20) {
                     ForEach(cards) { card in
-                        CardView(card: card)
-                            .aspectRatio(1, contentMode: .fit)
-                            .onTapGesture {
-                                flipCard(card)
-                            }
+                        CardView(card: card) { dot in
+                            selectDot(dot, from: card)
+                        }
                     }
                 }
                 .padding(.horizontal, 20)
                 
+                // Progress indicator
+                let matchedCount = cards.flatMap { $0.dots }.filter { $0.isMatched }.count / 2
+                let totalPairs = imageNames.count
+                
+                VStack(spacing: 8) {
+                    Text("Progress: \(matchedCount)/\(totalPairs) pairs")
+                        .font(.headline)
+                        .foregroundColor(.secondary)
+                    
+                    ProgressView(value: Double(matchedCount), total: Double(totalPairs))
+                        .progressViewStyle(LinearProgressViewStyle(tint: .green))
+                        .scaleEffect(x: 1, y: 2, anchor: .center)
+                        .padding(.horizontal, 40)
+                }
+                .padding(.horizontal, 20)
+                .padding(.vertical, 15)
+                .background(
+                    RoundedRectangle(cornerRadius: 20)
+                        .fill(.ultraThinMaterial)
+                )
+                .padding(.horizontal, 20)
+                
                 // Reset button
                 Button(action: resetGame) {
-                    HStack {
+                    HStack(spacing: 8) {
                         Image(systemName: "arrow.clockwise")
+                            .font(.title2)
                         Text("New Game")
+                            .font(.title2)
+                            .fontWeight(.semibold)
                     }
-                    .font(.title2)
-                    .fontWeight(.semibold)
                     .foregroundColor(.white)
                     .padding(.horizontal, 30)
                     .padding(.vertical, 15)
                     .background(
                         RoundedRectangle(cornerRadius: 25)
-                            .fill(LinearGradient(
-                                gradient: Gradient(colors: [Color.blue, Color.purple]),
-                                startPoint: .leading,
-                                endPoint: .trailing
-                            ))
+                            .fill(
+                                LinearGradient(
+                                    gradient: Gradient(colors: [Color.blue, Color.purple]),
+                                    startPoint: .leading,
+                                    endPoint: .trailing
+                                )
+                            )
+                            .shadow(color: .black.opacity(0.3), radius: 8, x: 0, y: 4)
                     )
-                    .shadow(color: .black.opacity(0.2), radius: 5, x: 0, y: 2)
                 }
                 .padding(.bottom, 30)
                 
@@ -88,118 +136,175 @@ struct ContentView: View {
         .onAppear {
             resetGame()
         }
-        .alert("Congratulations! 🎉", isPresented: $showingWinAlert) {
+        .alert("🎉 Congratulations! 🎉", isPresented: $showingWinAlert) {
             Button("Play Again") {
                 resetGame()
             }
         } message: {
-            Text("You completed the game in \(moves) moves!")
+            Text("You matched all pairs in \(moves) moves!")
         }
     }
     
-    private func flipCard(_ card: MemoryCard) {
-        guard let index = cards.firstIndex(where: { $0.id == card.id }),
-              !cards[index].isFaceUp,
-              !cards[index].isMatched,
-              flippedCards.count < 2 else { return }
+    private func selectDot(_ dot: Dot, from card: Card) {
+        guard let cardIndex = cards.firstIndex(where: { $0.id == card.id }),
+              let dotIndex = cards[cardIndex].dots.firstIndex(where: { $0.id == dot.id }),
+              !cards[cardIndex].dots[dotIndex].isRevealed,
+              !cards[cardIndex].dots[dotIndex].isMatched,
+              selectedDots.count < 2 else { return }
         
         withAnimation(.easeInOut(duration: 0.3)) {
-            cards[index].isFaceUp = true
+            cards[cardIndex].dots[dotIndex].isRevealed = true
+            cards[cardIndex].dots[dotIndex].isSelected = true
         }
         
-        flippedCards.append(cards[index])
+        selectedDots.append(cards[cardIndex].dots[dotIndex])
         
-        if flippedCards.count == 2 {
+        if selectedDots.count == 2 {
             moves += 1
             
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) {
                 checkForMatch()
             }
         }
     }
     
     private func checkForMatch() {
-        if flippedCards[0].symbol == flippedCards[1].symbol {
+        if selectedDots[0].imageName == selectedDots[1].imageName {
             // Match found
-            withAnimation(.easeInOut(duration: 0.3)) {
-                for flippedCard in flippedCards {
-                    if let index = cards.firstIndex(where: { $0.id == flippedCard.id }) {
-                        cards[index].isMatched = true
+            withAnimation(.easeInOut(duration: 0.4)) {
+                for selectedDot in selectedDots {
+                    for cardIndex in cards.indices {
+                        if let dotIndex = cards[cardIndex].dots.firstIndex(where: { $0.id == selectedDot.id }) {
+                            cards[cardIndex].dots[dotIndex].isMatched = true
+                            cards[cardIndex].dots[dotIndex].isSelected = false
+                        }
                     }
                 }
             }
             
             // Check if game is won
-            if cards.allSatisfy({ $0.isMatched }) {
+            let allMatched = cards.flatMap { $0.dots }.allSatisfy { $0.isMatched }
+            if allMatched {
                 gameWon = true
                 showingWinAlert = true
             }
         } else {
-            // No match, flip cards back
-            withAnimation(.easeInOut(duration: 0.3)) {
-                for flippedCard in flippedCards {
-                    if let index = cards.firstIndex(where: { $0.id == flippedCard.id }) {
-                        cards[index].isFaceUp = false
+            // No match, hide dots back
+            withAnimation(.easeInOut(duration: 0.4)) {
+                for selectedDot in selectedDots {
+                    for cardIndex in cards.indices {
+                        if let dotIndex = cards[cardIndex].dots.firstIndex(where: { $0.id == selectedDot.id }) {
+                            cards[cardIndex].dots[dotIndex].isRevealed = false
+                            cards[cardIndex].dots[dotIndex].isSelected = false
+                        }
                     }
                 }
             }
         }
         
-        flippedCards.removeAll()
+        selectedDots.removeAll()
     }
     
     private func resetGame() {
-        cards = symbols.shuffled().map { MemoryCard(symbol: $0) }
-        flippedCards.removeAll()
+        // Create two cards with shuffled images
+        var allImages = imageNames + imageNames // 18 total (9 pairs)
+        allImages.shuffle()
+        
+        let firstCardDots = allImages.prefix(9).map { Dot(imageName: $0) }
+        let secondCardDots = allImages.suffix(9).map { Dot(imageName: $0) }
+        
+        cards = [
+            Card(dots: firstCardDots),
+            Card(dots: secondCardDots)
+        ]
+        
+        selectedDots.removeAll()
         moves = 0
         gameWon = false
     }
 }
 
 struct CardView: View {
-    let card: MemoryCard
+    let card: Card
+    let onDotTap: (Dot) -> Void
     
     var body: some View {
-        ZStack {
-            RoundedRectangle(cornerRadius: 15)
+        VStack(spacing: 8) {
+            // Card background
+            RoundedRectangle(cornerRadius: 20)
                 .fill(
                     LinearGradient(
-                        gradient: Gradient(colors: card.isFaceUp ? 
-                            [Color.white, Color.gray.opacity(0.1)] : 
-                            [Color.blue, Color.purple]),
+                        gradient: Gradient(colors: [Color.white.opacity(0.9), Color.gray.opacity(0.1)]),
                         startPoint: .topLeading,
                         endPoint: .bottomTrailing
                     )
                 )
-                .shadow(color: .black.opacity(0.2), radius: 5, x: 0, y: 2)
-            
-            if card.isFaceUp {
-                Image(systemName: card.symbol)
-                    .font(.system(size: 40, weight: .medium))
-                    .foregroundColor(card.isMatched ? .green : .blue)
-                    .scaleEffect(card.isMatched ? 1.2 : 1.0)
-                    .animation(.easeInOut(duration: 0.3), value: card.isMatched)
-            } else {
-                RoundedRectangle(cornerRadius: 15)
-                    .fill(
-                        LinearGradient(
-                            gradient: Gradient(colors: [Color.blue.opacity(0.8), Color.purple.opacity(0.8)]),
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        )
+                .overlay(
+                    RoundedRectangle(cornerRadius: 20)
+                        .stroke(Color.blue.opacity(0.3), lineWidth: 2)
+                )
+                .shadow(color: .black.opacity(0.2), radius: 8, x: 0, y: 4)
+                .overlay(
+                    // 3x3 Grid of Dots
+                    LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 8), count: 3), spacing: 8) {
+                        ForEach(card.dots) { dot in
+                            DotView(dot: dot)
+                                .aspectRatio(1, contentMode: .fit)
+                                .onTapGesture {
+                                    onDotTap(dot)
+                                }
+                        }
+                    }
+                    .padding(20)
+                )
+        }
+        .frame(width: 160, height: 160)
+    }
+}
+
+struct DotView: View {
+    let dot: Dot
+    
+    var body: some View {
+        ZStack {
+            // Dot background
+            Circle()
+                .fill(
+                    LinearGradient(
+                        gradient: Gradient(colors: dot.isRevealed ? 
+                            [Color.white, Color.gray.opacity(0.1)] : 
+                            [Color.blue.opacity(0.8), Color.purple.opacity(0.8)]),
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
                     )
+                )
+                .overlay(
+                    Circle()
+                        .stroke(
+                            dot.isSelected ? Color.yellow : Color.clear,
+                            lineWidth: 2
+                        )
+                )
+                .shadow(color: .black.opacity(0.2), radius: 3, x: 0, y: 2)
+            
+            if dot.isRevealed {
+                Image(systemName: dot.imageName)
+                    .font(.system(size: 16, weight: .medium))
+                    .foregroundColor(dot.isMatched ? .green : .blue)
+                    .scaleEffect(dot.isMatched ? 1.2 : 1.0)
+                    .animation(.easeInOut(duration: 0.3), value: dot.isMatched)
+            } else {
+                Circle()
+                    .fill(Color.white.opacity(0.2))
+                    .frame(width: 8, height: 8)
                     .overlay(
-                        Image(systemName: "questionmark")
-                            .font(.system(size: 30, weight: .medium))
-                            .foregroundColor(.white.opacity(0.7))
+                        Circle()
+                            .stroke(Color.white.opacity(0.5), lineWidth: 1)
                     )
             }
         }
-        .rotation3DEffect(
-            .degrees(card.isFaceUp ? 0 : 180),
-            axis: (x: 0, y: 1, z: 0)
-        )
-        .animation(.easeInOut(duration: 0.3), value: card.isFaceUp)
+        .scaleEffect(dot.isSelected ? 1.1 : 1.0)
+        .animation(.easeInOut(duration: 0.2), value: dot.isSelected)
     }
 }
 
