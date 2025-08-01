@@ -33,6 +33,27 @@
 //        "leaf.fill", "flame.fill", "drop.fill", "bolt.fill", "gift.fill"
 //    ]
 //    
+//    // Dynamic dimensions based on screen width
+//    private var screenWidth: CGFloat {
+//        UIScreen.main.bounds.width
+//    }
+//    
+//    private var cardSize: CGFloat {
+//        let availableWidth = screenWidth - 60 // Account for padding and spacing
+//        return min(availableWidth / 2, 200) // Cap at 200 for larger screens
+//    }
+//    
+//    private var dotSize: CGFloat {
+//        let gridSpacing: CGFloat = 8
+//        let padding: CGFloat = 20
+//        let availableDotSpace = cardSize - (padding * 2) - (gridSpacing * 2)
+//        return availableDotSpace / 3
+//    }
+//    
+//    private var dotIconSize: CGFloat {
+//        dotSize * 0.4 // 40% of dot size for the icon
+//    }
+//    
 //    var body: some View {
 //        ZStack {
 //            // Beautiful gradient background
@@ -75,7 +96,7 @@
 //                // Two Cards with 3x3 dots each
 //                HStack(spacing: 20) {
 //                    ForEach(cards) { card in
-//                        CardView(card: card) { dot in
+//                        CardView(card: card, cardSize: cardSize, dotSize: dotSize, dotIconSize: dotIconSize) { dot in
 //                            selectDot(dot, from: card)
 //                        }
 //                    }
@@ -226,6 +247,9 @@
 //
 //struct CardView: View {
 //    let card: Card
+//    let cardSize: CGFloat
+//    let dotSize: CGFloat
+//    let dotIconSize: CGFloat
 //    let onDotTap: (Dot) -> Void
 //    
 //    var body: some View {
@@ -248,7 +272,7 @@
 //                    // 3x3 Grid of Dots
 //                    LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 8), count: 3), spacing: 8) {
 //                        ForEach(card.dots) { dot in
-//                            DotView(dot: dot)
+//                            DotView(dot: dot, dotSize: dotSize, dotIconSize: dotIconSize)
 //                                .aspectRatio(1, contentMode: .fit)
 //                                .onTapGesture {
 //                                    onDotTap(dot)
@@ -258,12 +282,14 @@
 //                    .padding(20)
 //                )
 //        }
-//        .frame(width: 160, height: 160)
+//        .frame(width: cardSize, height: cardSize)
 //    }
 //}
 //
 //struct DotView: View {
 //    let dot: Dot
+//    let dotSize: CGFloat
+//    let dotIconSize: CGFloat
 //    
 //    var body: some View {
 //        ZStack {
@@ -289,20 +315,21 @@
 //            
 //            if dot.isRevealed {
 //                Image(systemName: dot.imageName)
-//                    .font(.system(size: 16, weight: .medium))
+//                    .font(.system(size: dotIconSize, weight: .medium))
 //                    .foregroundColor(dot.isMatched ? .green : .blue)
 //                    .scaleEffect(dot.isMatched ? 1.2 : 1.0)
 //                    .animation(.easeInOut(duration: 0.3), value: dot.isMatched)
 //            } else {
 //                Circle()
 //                    .fill(Color.white.opacity(0.2))
-//                    .frame(width: 8, height: 8)
+//                    .frame(width: dotIconSize * 0.5, height: dotIconSize * 0.5)
 //                    .overlay(
 //                        Circle()
 //                            .stroke(Color.white.opacity(0.5), lineWidth: 1)
 //                    )
 //            }
 //        }
+//        .frame(width: dotSize, height: dotSize)
 //        .scaleEffect(dot.isSelected ? 1.1 : 1.0)
 //        .animation(.easeInOut(duration: 0.2), value: dot.isSelected)
 //    }
